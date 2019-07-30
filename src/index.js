@@ -8,19 +8,26 @@ import borderData from "./border.js";
 import Modal from "react-modal";
 
 class App extends React.Component {
-  state = {
-    markerPosition: { lat: 44.5588, lng: -72.5778 },
-    mapCenter: { lat: '?', lng: '?' },
-    town: "?",
-    county: "?",
-    score: 100,
-    gameStart: false,
-    giveUp: false,
-    modalOpen: false
-  };
+  constructor() {
+    super();
+    this.state = {
+      markerPosition: { lat: 44.5588, lng: -72.5778 },
+      mapCenter: { lat: "?", lng: "?" },
+      town: "?",
+      county: "?",
+      score: 100,
+      gameStart: false,
+      giveUp: false,
+      modalOpen: false,
+      playerName: "",
+      win: false
+    };
+    this.handleNameInput = this.handleNameInput.bind(this);
+    this.handleSubmit = this.handleSubmit.bind(this);
+  }
 
   startGame = () => {
-    this.gameStart();
+    this.reset();
     document.getElementById("start-button").disabled = true;
     document.getElementById("guess-button").disabled = false;
     document.getElementById("quit-button").disabled = false;
@@ -53,10 +60,12 @@ class App extends React.Component {
     document.getElementById("start-button").disabled = false;
     document.getElementById("guess-button").disabled = true;
     document.getElementById("quit-button").disabled = true;
+    document.addEventListener("keydown", this.arrowKeyListner);
   };
   componentDidUpdate = () => {
     console.log(this.state.score);
     console.log(this.state.modalOpen);
+    console.log(this.state.playerName);
   };
   getRandoLat = () => {
     let lat = Math.random() * (45.005419 - 42.730315) + 42.730315;
@@ -103,24 +112,40 @@ class App extends React.Component {
 
   gaveUp = () => {
     this.setState({
-      giveUp: true
+      giveUp: true,
+      gameStart: false
     });
   };
 
-  gameStart = () => {
+  reset = () => {
     this.setState({
+      win: false,
+      playerName: "",
       score: 100,
       gameStart: true,
       giveUp: false,
       county: "?",
-      town: '?',
-      markerPosition:{
+      town: "?",
+      markerPosition: {
         lat: "?",
         lng: "?"
       }
     });
   };
 
+  arrowKeyListner = e => {
+    if (this.state.gameStart) {
+      if (e.key === "ArrowUp") {
+        this.moveNorth();
+      } else if (e.key === "ArrowDown") {
+        this.moveSouth();
+      } else if (e.key === "ArrowLeft") {
+        this.moveWest();
+      } else if (e.key === "ArrowRight") {
+        this.moveEast();
+      }
+    }
+  };
 
   moveNorth = () => {
     const lat = this.state.mapCenter.lat;
@@ -184,7 +209,7 @@ class App extends React.Component {
   };
 
   handleOpenModal = () => {
-    this.setState({ modalOpen: true })
+    this.setState({ modalOpen: true });
   };
 
   handleCloseModal = () => {
@@ -196,32 +221,68 @@ class App extends React.Component {
     this.subtitle.style.color = "#f00";
   };
 
-  handleGuess = (e) => {
-    const score = this.state.score
-    this.lookupLocation()
-    let guess = document.getElementById('selectedOption').value
+  handleGuess = e => {
+    const score = this.state.score;
+    this.lookupLocation();
+    let guess = document.getElementById("selectedOption").value;
     if (this.state.county.includes(guess)) {
-        this.subtitle.textContent = `CORRECT.. YOU WIN!! Score: ${this.state.score}`
-        document.getElementById('modalGuess').disabled = true
+      this.subtitle.textContent = `CORRECT.. YOU WIN!! Score: ${
+        this.state.score
+      }`;
+      this.setState({
+        win: true
+      });
+      document.getElementById("modalGuess").disabled = true;
     } else {
-      this.subtitle.textContent = "WRONG.. GUESS AGAIN"
+      this.subtitle.textContent = "WRONG.. GUESS AGAIN";
       this.setState({
         score: score - 1
+      });
+    }
+  };
+
+  async handleSubmit(evt) {
+    evt.preventDefault();
+    const response = await fetch("/scores", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        name: this.state.playerName,
+        score: this.state.score
       })
+    });
+    const result = await response.text();
+    console.log("Result is: ", result);
+    if (result === "Success") {
+      const nextResponse = await fetch("/scores");
+      const json = nextResponse.json();
+      this.setState({
+        name: json.playerName
+      });
     }
-    }
+  }
+
+  handleNameInput(e) {
+    this.setState({
+      playerName: e.target.value
+    });
+    console.log(e.target.value);
+  }
 
   render() {
-    let style = {}
+    let style = {};
     if (this.state.modalOpen) {
-      style = {filter: 'blur(3px)'} 
-    } else{ style = {}
+      style = { filter: "blur(3px)" };
+    } else {
+      style = {};
     }
 
     const img = {
       height: "500px"
     };
-    
+
     const customStyles = {
       content: {
         top: "50%",
@@ -230,24 +291,23 @@ class App extends React.Component {
         bottom: "auto",
         marginRight: "-50%",
         transform: "translate(-50%, -50%)",
-        zIndex: '500'
-        
+        zIndex: "500"
       }
     };
-    let mapWrapper= {
-      width: '75%',
-      height: '500px'
-    }
+    let mapWrapper = {
+      width: "75%",
+      height: "500px"
+    };
     let onScreenStyle = {
-      display: 'flex',
-    }
-    let navBarStyle= {
-      display: 'flex',
-    }
+      display: "flex"
+    };
+    let navBarStyle = {
+      display: "flex"
+    };
 
     let buttonBlockStyle = {
-      marginTop : '50px'
-    }
+      marginTop: "50px"
+    };
 
     const {
       markerPosition,
@@ -256,41 +316,62 @@ class App extends React.Component {
       town,
       county,
       score,
+      gameStart
     } = this.state;
     return (
-  <div id="app" style={style}>
-      <div id='navBar'>
-        <InfoPanel
-          markerPosition={markerPosition}
-          giveUp={giveUp}
-          town={town}
-          county={county}
-          score={score}
+      <div id="app" style={style}>
+        <div id="navBar">
+          <InfoPanel
+            markerPosition={markerPosition}
+            giveUp={giveUp}
+            town={town}
+            county={county}
+            score={score}
           />
-      </div>
-      <div id = "onScreen" style = {onScreenStyle}>
-      <div id="map" style = {mapWrapper} >
-        <Map markerPosition={markerPosition} mapCenter={mapCenter} />
         </div>
+        <div id="onScreen" style={onScreenStyle} onKeyPress={this.moveNorth}>
+          <div id="map" style={mapWrapper}>
+            <Map
+              markerPosition={markerPosition}
+              mapCenter={mapCenter}
+              gameStart={gameStart}
+            />
+          </div>
           <img
             class="county-image"
             style={img}
             src="https://geology.com/county-map/vermont-county-map.gif"
-            />
-            </div> 
+          />
+        </div>
         <Modal
           style={customStyles}
           isOpen={this.state.modalOpen}
           onAfterOpen={this.afterOpenModal}
         >
-          <h2 ref={subtitle => (this.subtitle = subtitle)}>Which Vermont County Are You Looking At?</h2>
+          <h2 ref={subtitle => (this.subtitle = subtitle)}>
+            Which Vermont County Are You Looking At?
+          </h2>
+          {this.state.win ? (
+            <form onSubmit={this.handleSubmit} method="POST" action="/scores">
+              <label htmlFor="name">Enter Name here:</label>
+              <br />
+              <input
+                onChange={this.handleNameInput}
+                name="name"
+                placeholder="enter your name..."
+              />
+              <input type="submit" value="Submit" />
+            </form>
+          ) : (
+            <div />
+          )}
           <p>
             <label>
-               Make a Guess: 
-              <select id = "selectedOption">
+              Make a Guess:
+              <select id="selectedOption">
                 <option>Addison</option>
                 <option>Bennington</option>
-                <option>Caladonia</option>
+                <option>Caledonia</option>
                 <option>Chittenden</option>
                 <option>Essex</option>
                 <option>Franklin</option>
@@ -305,13 +386,15 @@ class App extends React.Component {
               </select>
             </label>
           </p>
-          <button id= "modalClose"  onClick={this.handleCloseModal}>Close Modal</button>
-          <button id = "modalGuess" onClick = {this.handleGuess}>Guess</button>
+          <button id="modalClose" onClick={this.handleCloseModal}>
+            Close Modal
+          </button>
+          <button id="modalGuess" onClick={this.handleGuess}>
+            Guess
+          </button>
         </Modal>
 
-        
-
-        <div id ="button nav" style ={buttonBlockStyle}>
+        <div id="button nav" style={buttonBlockStyle}>
           <button id="start-button" onClick={this.startGame}>
             Start Game
           </button>
@@ -319,6 +402,7 @@ class App extends React.Component {
             {" "}
             Guess Spot
           </button>
+
           <button id="quit-button" onClick={this.showLocation}>
             I Give Up
           </button>

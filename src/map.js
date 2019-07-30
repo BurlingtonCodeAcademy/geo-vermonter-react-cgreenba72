@@ -29,8 +29,8 @@ class Map extends React.Component {
     const border = L.geoJSON(borderData)
     border.addTo(this.map)
     border.setStyle(borderStyle)
+    // removes old line
   }
-  
   componentDidUpdate({ markerPosition, mapCenter }) {
     // check if position has changed
     if (this.props.markerPosition !== markerPosition) {
@@ -40,9 +40,18 @@ class Map extends React.Component {
     if (this.props.mapCenter !== mapCenter){
       this.map.panTo(this.props.mapCenter)
       moveHistory.push(this.props.mapCenter)
-      L.polyline([moveHistory], {color: 'green'}).addTo(this.map)
+      const line = L.polyline([moveHistory], {color: 'green'}).addTo(this.map)
     }
-   
+    if (!this.props.gameStart) {
+      moveHistory = []
+      }
+   this.map.removeControl(this.map.zoomControl)
+   this.map.touchZoom.disable()
+   this.map.dragging.disable()
+   this.map.doubleClickZoom.disable()
+   this.map.scrollWheelZoom.disable()
+   this.map.boxZoom.disable()
+   this.map.keyboard.disable()
   }
   render() {
     return <div id="map" style={style} />;
